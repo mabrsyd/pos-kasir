@@ -53,7 +53,9 @@ router.patch('/:id', authorize('OWNER', 'ADMIN'), validate(categorySchema.partia
 // DELETE /api/v1/categories/:id (soft delete)
 router.delete('/:id', authorize('OWNER', 'ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const productCount = await prisma.product.count({ where: { categoryId: req.params.id as string } });
+    const productCount = await prisma.product.count({
+      where: { categoryId: req.params.id as string },
+    });
     if (productCount > 0) {
       const category = await prisma.category.update({
         where: { id: req.params.id as string },

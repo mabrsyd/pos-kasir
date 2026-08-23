@@ -38,7 +38,11 @@ export function errorHandler(
   }
 
   if (err instanceof Prisma.PrismaClientValidationError) {
-    res.status(400).json(errorResponse('Data yang dikirim tidak valid.'));
+    res.status(400).json({
+      success: false,
+      error: 'Data yang dikirim tidak valid.',
+      details: err.message,
+    });
     return;
   }
 

@@ -98,14 +98,45 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       .sort((a, b) => b.total - a.total)
       .slice(0, 10);
 
+    // Fuel sales today
+    const fuelSalesToday = salesToday.flatMap(s => s.items).filter(i => {
+      const prod = allActiveProducts.find(p => p.id === i.productId);
+      return prod?.productType === 'FUEL';
+    });
+    const fuelLitersToday = fuelSalesToday.reduce((sum, i) => sum + Number(i.quantity), 0);
+    const fuelRevenueToday = fuelSalesToday.reduce((sum, i) => sum + Number(i.total), 0);
+
+    const cashTotal = cashSales.reduce((s, sale) => {
+      const cashPay = sale.payments.find(p => p.method === 'CASH');
+      return s + (cashPay ? Number(cashPay.amount) : 0);
+    }, 0);
+    const digitalTotal = digitalSales.reduce((s, sale) => {
+      const digPay = sale.payments.find(p => p.method === 'DIGITAL');
+      return s + (digPay ? Number(digPay.amount) : 0);
+    }, 0);
+
     res.json(successResponse({
+      summary: {
+        revenue: totalSalesToday,
+        cogs: cogsTodayVal,
+        grossProfit,
+        transactionCount,
+        itemsSold,
+        lowStockCount: lowStockProducts.length,
+      },
       salesToday: {
         total: totalSalesToday,
         transactionCount,
         itemsSold,
+        cogs: cogsTodayVal,
         grossProfit,
-        cashTotal: cashSales.reduce((s, sale) => s + Number(sale.total), 0),
-        digitalTotal: digitalSales.reduce((s, sale) => s + Number(sale.total), 0),
+        cashTotal,
+        digitalTotal,
+      },
+      fuelToday: {
+        liters: fuelLitersToday,
+        revenue: fuelRevenueToday,
+        count: fuelSalesToday.length,
       },
       expenses: {
         total: totalExpenses,

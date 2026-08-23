@@ -82,7 +82,7 @@ model Category {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  products Product[] @relation("ProductCategories")
+  products Product[]
 
   @@map("categories")
 }
@@ -114,6 +114,7 @@ model Product {
   name          String
   sku           String      @unique
   barcode       String?     @unique
+  categoryId    String      @map("category_id")
   unitId        String      @map("unit_id")
   productType   ProductType @default(RETAIL) @map("product_type")
   purchasePrice Decimal     @default(0) @map("purchase_price") @db.Decimal(15, 2)
@@ -124,7 +125,7 @@ model Product {
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
-  categories     Category[]      @relation("ProductCategories")
+  category       Category        @relation(fields: [categoryId], references: [id])
   unit           Unit            @relation(fields: [unitId], references: [id])
   priceHistories PriceHistory[]
   stockMovements StockMovement[]
@@ -132,6 +133,7 @@ model Product {
   purchaseItems  PurchaseItem[]
   returnItems    ReturnItem[]
 
+  @@index([categoryId])
   @@index([unitId])
   @@index([productType])
   @@index([isActive])
