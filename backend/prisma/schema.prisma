@@ -1,0 +1,586 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ROLES & USERS
+// ============================================================
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // OWNER, ADMIN, CASHIER
+  description String?  @db.Text
+  permissions Json     // JSON array of permission strings
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  password     String   // bcrypt hashed
+  fullName     String   @map("full_name")
+  roleId       String   @map("role_id")
+  isActive     Boolean  @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  role          Role           @relation(fields: [roleId], references: [id])
+  sales         Sale[]
+  cashSessions  CashSession[]
+  stockMovements StockMovement[]
+  auditLogs     AuditLog[]
+  expenses      Expense[]
+  purchases     Purchase[]
+  returns       Return[]
+
+  @@index([roleId])
+  @@map("users")
+}
+
+// ============================================================
+// DEVICES
+// ============================================================
+
+model Device {
+  id         String   @id @default(uuid())
+  name       String
+  deviceId   String   @unique @map("device_id") // client-generated
+  isActive   Boolean  @default(true) @map("is_active")
+  lastSyncAt DateTime? @map("last_sync_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  sales          Sale[]
+  syncOperations SyncOperation[]
+
+  @@map("devices")
+}
+
+// ============================================================
+// CATEGORIES & UNITS
+// ============================================================
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  products Product[] @relation("ProductCategories")
+
+  @@map("categories")
+}
+
+model Unit {
+  id          String   @id @default(uuid())
+  name        String   @unique  // pcs, kg, liter, etc.
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  products Product[]
+
+  @@map("units")
+}
+
+// ============================================================
+// PRODUCTS
+// ============================================================
+
+enum ProductType {
+  RETAIL
+  FUEL
+  OTHER
+}
+
+model Product {
+  id            String      @id @default(uuid())
+  name          String
+  sku           String      @unique
+  barcode       String?     @unique
+  unitId        String      @map("unit_id")
+  productType   ProductType @default(RETAIL) @map("product_type")
+  purchasePrice Decimal     @default(0) @map("purchase_price") @db.Decimal(15, 2)
+  sellingPrice  Decimal     @default(0) @map("selling_price") @db.Decimal(15, 2)
+  minimumStock  Decimal     @default(0) @map("minimum_stock") @db.Decimal(15, 3)
+  currentStock  Decimal     @default(0) @map("current_stock") @db.Decimal(15, 3)
+  isActive      Boolean     @default(true) @map("is_active")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  categories     Category[]      @relation("ProductCategories")
+  unit           Unit            @relation(fields: [unitId], references: [id])
+  priceHistories PriceHistory[]
+  stockMovements StockMovement[]
+  saleItems      SaleItem[]
+  purchaseItems  PurchaseItem[]
+  returnItems    ReturnItem[]
+
+  @@index([unitId])
+  @@index([productType])
+  @@index([isActive])
+  @@index([name])
+  @@map("products")
+}
+
+model PriceHistory {
+  id            String   @id @default(uuid())
+  productId     String   @map("product_id")
+  purchasePrice Decimal  @map("purchase_price") @db.Decimal(15, 2)
+  sellingPrice  Decimal  @map("selling_price") @db.Decimal(15, 2)
+  changedBy     String   @map("changed_by") // user id
+  reason        String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@map("price_histories")
+}
+
+// ============================================================
+// STOCK
+// ============================================================
+
+enum MovementType {
+  OPENING
+  PURCHASE
+  SALE
+  RETURN
+  DAMAGE
+  LOSS
+  ADJUSTMENT
+  VOID_REVERSAL
+}
+
+model StockMovement {
+  id            String       @id @default(uuid())
+  productId     String       @map("product_id")
+  movementType  MovementType @map("movement_type")
+  quantity      Decimal      @db.Decimal(15, 3) // positive for in, negative for out
+  stockBefore   Decimal      @map("stock_before") @db.Decimal(15, 3)
+  stockAfter    Decimal      @map("stock_after") @db.Decimal(15, 3)
+  referenceId   String?      @map("reference_id") // sale_id, purchase_id, etc.
+  referenceType String?      @map("reference_type") // SALE, PURCHASE, RETURN, etc.
+  reason        String?      @db.Text
+  userId        String       @map("user_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([productId])
+  @@index([movementType])
+  @@index([referenceId])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+// ============================================================
+// SUPPLIERS
+// ============================================================
+
+model Supplier {
+  id          String   @id @default(uuid())
+  name        String
+  phone       String?
+  address     String?  @db.Text
+  notes       String?  @db.Text
+  totalDebt   Decimal  @default(0) @map("total_debt") @db.Decimal(15, 2)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  purchases Purchase[]
+
+  @@map("suppliers")
+}
+
+// ============================================================
+// CUSTOMERS
+// ============================================================
+
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String?
+  address   String?  @db.Text
+  notes     String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sales Sale[]
+
+  @@map("customers")
+}
+
+// ============================================================
+// SALES
+// ============================================================
+
+enum SaleStatus {
+  COMPLETED
+  VOIDED
+}
+
+model Sale {
+  id                  String     @id @default(uuid())
+  invoiceNumber       String     @unique @map("invoice_number")
+  clientTransactionId String?    @unique @map("client_transaction_id") // idempotency key
+  deviceId            String?    @map("device_id")
+  cashierId           String     @map("cashier_id")
+  customerId          String?    @map("customer_id")
+  cashSessionId       String?    @map("cash_session_id")
+  subtotal            Decimal    @default(0) @db.Decimal(15, 2)
+  discountAmount      Decimal    @default(0) @map("discount_amount") @db.Decimal(15, 2)
+  taxAmount           Decimal    @default(0) @map("tax_amount") @db.Decimal(15, 2)
+  total               Decimal    @default(0) @db.Decimal(15, 2)
+  status              SaleStatus @default(COMPLETED)
+  voidReason          String?    @map("void_reason") @db.Text
+  voidedAt            DateTime?  @map("voided_at")
+  voidedBy            String?    @map("voided_by")
+  notes               String?    @db.Text
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+
+  device      Device?      @relation(fields: [deviceId], references: [id])
+  cashier     User         @relation(fields: [cashierId], references: [id])
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+  cashSession CashSession? @relation(fields: [cashSessionId], references: [id])
+  items       SaleItem[]
+  payments    Payment[]
+  returns     Return[]
+
+  @@index([cashierId])
+  @@index([customerId])
+  @@index([cashSessionId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("sales")
+}
+
+model SaleItem {
+  id           String  @id @default(uuid())
+  saleId       String  @map("sale_id")
+  productId    String  @map("product_id")
+  productName  String  @map("product_name")  // snapshot
+  productSku   String  @map("product_sku")   // snapshot
+  unitName     String  @map("unit_name")     // snapshot
+  sellingPrice Decimal @map("selling_price") @db.Decimal(15, 2) // snapshot
+  costPrice    Decimal @map("cost_price") @db.Decimal(15, 2)    // snapshot
+  quantity     Decimal @db.Decimal(15, 3)
+  subtotal     Decimal @db.Decimal(15, 2) // sellingPrice * quantity
+  discount     Decimal @default(0) @db.Decimal(15, 2)
+  total        Decimal @db.Decimal(15, 2) // subtotal - discount
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  sale    Sale    @relation(fields: [saleId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([saleId])
+  @@index([productId])
+  @@map("sale_items")
+}
+
+// ============================================================
+// PAYMENTS
+// ============================================================
+
+enum PaymentMethod {
+  CASH
+  DIGITAL
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  saleId         String        @map("sale_id")
+  method         PaymentMethod
+  amount         Decimal       @db.Decimal(15, 2)
+  amountReceived Decimal?      @map("amount_received") @db.Decimal(15, 2) // for cash
+  change         Decimal?      @db.Decimal(15, 2) // for cash
+  reference      String?       // for digital payment ref
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  sale Sale @relation(fields: [saleId], references: [id])
+
+  @@index([saleId])
+  @@map("payments")
+}
+
+// ============================================================
+// PURCHASES
+// ============================================================
+
+enum PurchaseStatus {
+  PENDING
+  RECEIVED
+  PARTIAL
+  CANCELLED
+}
+
+model Purchase {
+  id            String         @id @default(uuid())
+  purchaseNumber String        @unique @map("purchase_number")
+  supplierId    String         @map("supplier_id")
+  userId        String         @map("user_id") // who created
+  status        PurchaseStatus @default(PENDING)
+  subtotal      Decimal        @default(0) @db.Decimal(15, 2)
+  taxAmount     Decimal        @default(0) @map("tax_amount") @db.Decimal(15, 2)
+  total         Decimal        @default(0) @db.Decimal(15, 2)
+  paidAmount    Decimal        @default(0) @map("paid_amount") @db.Decimal(15, 2)
+  debtAmount    Decimal        @default(0) @map("debt_amount") @db.Decimal(15, 2) // total - paidAmount
+  notes         String?        @db.Text
+  receivedAt    DateTime?      @map("received_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  supplier Supplier       @relation(fields: [supplierId], references: [id])
+  user     User           @relation(fields: [userId], references: [id])
+  items    PurchaseItem[]
+
+  @@index([supplierId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id            String  @id @default(uuid())
+  purchaseId    String  @map("purchase_id")
+  productId     String  @map("product_id")
+  productName   String  @map("product_name") // snapshot
+  quantity      Decimal @db.Decimal(15, 3)
+  purchasePrice Decimal @map("purchase_price") @db.Decimal(15, 2)
+  subtotal      Decimal @db.Decimal(15, 2)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@index([purchaseId])
+  @@index([productId])
+  @@map("purchase_items")
+}
+
+// ============================================================
+// RETURNS
+// ============================================================
+
+enum ReturnCondition {
+  GOOD
+  DAMAGED
+  LOST
+}
+
+model Return {
+  id           String   @id @default(uuid())
+  returnNumber String   @unique @map("return_number")
+  saleId       String   @map("sale_id")
+  userId       String   @map("user_id")
+  totalRefund  Decimal  @default(0) @map("total_refund") @db.Decimal(15, 2)
+  reason       String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  sale  Sale         @relation(fields: [saleId], references: [id])
+  user  User         @relation(fields: [userId], references: [id])
+  items ReturnItem[]
+
+  @@index([saleId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("returns")
+}
+
+model ReturnItem {
+  id           String          @id @default(uuid())
+  returnId     String          @map("return_id")
+  productId    String          @map("product_id")
+  productName  String          @map("product_name") // snapshot
+  quantity     Decimal         @db.Decimal(15, 3)
+  sellingPrice Decimal         @map("selling_price") @db.Decimal(15, 2) // snapshot
+  subtotal     Decimal         @db.Decimal(15, 2)
+  condition    ReturnCondition @default(GOOD)
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  return_ Return  @relation(fields: [returnId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([returnId])
+  @@index([productId])
+  @@map("return_items")
+}
+
+// ============================================================
+// CASH SESSIONS
+// ============================================================
+
+enum CashSessionStatus {
+  OPEN
+  CLOSED
+}
+
+model CashSession {
+  id              String            @id @default(uuid())
+  userId          String            @map("user_id")
+  openingBalance  Decimal           @map("opening_balance") @db.Decimal(15, 2)
+  expectedBalance Decimal           @default(0) @map("expected_balance") @db.Decimal(15, 2)
+  actualBalance   Decimal?          @map("actual_balance") @db.Decimal(15, 2)
+  difference      Decimal?          @db.Decimal(15, 2)
+  status          CashSessionStatus @default(OPEN)
+  notes           String?           @db.Text
+  openedAt        DateTime          @default(now()) @map("opened_at")
+  closedAt        DateTime?         @map("closed_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  user             User              @relation(fields: [userId], references: [id])
+  cashTransactions CashTransaction[]
+  sales            Sale[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("cash_sessions")
+}
+
+// ============================================================
+// CASH TRANSACTIONS
+// ============================================================
+
+enum CashTransactionType {
+  CASH_IN
+  CASH_OUT
+  SALE
+  REFUND
+  EXPENSE
+  VOID_REVERSAL
+}
+
+model CashTransaction {
+  id            String              @id @default(uuid())
+  cashSessionId String              @map("cash_session_id")
+  type          CashTransactionType
+  amount        Decimal             @db.Decimal(15, 2) // positive for in, negative for out
+  referenceId   String?             @map("reference_id")
+  referenceType String?             @map("reference_type")
+  description   String?             @db.Text
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  cashSession CashSession @relation(fields: [cashSessionId], references: [id])
+
+  @@index([cashSessionId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("cash_transactions")
+}
+
+// ============================================================
+// EXPENSES
+// ============================================================
+
+model Expense {
+  id            String        @id @default(uuid())
+  category      String        // listrik, internet, transport, etc.
+  amount        Decimal       @db.Decimal(15, 2)
+  description   String?       @db.Text
+  paymentMethod PaymentMethod @default(CASH) @map("payment_method")
+  userId        String        @map("user_id")
+  expenseDate   DateTime      @map("expense_date") @db.Date
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([category])
+  @@index([expenseDate])
+  @@map("expenses")
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+
+model Setting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+// ============================================================
+// AUDIT LOGS
+// ============================================================
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  action       String   // PRICE_CHANGE, STOCK_ADJUSTMENT, VOID, RETURN, etc.
+  entityType   String   @map("entity_type") // PRODUCT, SALE, etc.
+  entityId     String   @map("entity_id")
+  oldValues    Json?    @map("old_values")
+  newValues    Json?    @map("new_values")
+  description  String?  @db.Text
+  ipAddress    String?  @map("ip_address")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================
+// SYNC OPERATIONS
+// ============================================================
+
+enum SyncStatus {
+  PENDING
+  SYNCING
+  SYNCED
+  FAILED
+  CONFLICT
+}
+
+model SyncOperation {
+  id                  String     @id @default(uuid())
+  deviceId            String     @map("device_id")
+  clientTransactionId String     @unique @map("client_transaction_id")
+  operationType       String     @map("operation_type") // SALE, RETURN, etc.
+  payload             Json
+  status              SyncStatus @default(PENDING)
+  errorMessage        String?    @map("error_message") @db.Text
+  retryCount          Int        @default(0) @map("retry_count")
+  createdAt           DateTime   @default(now()) @map("created_at")
+  syncedAt            DateTime?  @map("synced_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+
+  device Device @relation(fields: [deviceId], references: [id])
+
+  @@index([deviceId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("sync_operations")
+}
