@@ -19,6 +19,9 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { OfflineIndicator } from '@/components/OfflineIndicator';
+import { BottomNav } from '@/components/BottomNav';
+import { SyncIndicator } from '@/components/SyncIndicator';
 
 import React, { Component, ErrorInfo } from 'react';
 
@@ -103,6 +106,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Kasir (POS)', href: '/pos', icon: ShoppingCart },
     { name: 'Sesi Kasir', href: '/cash-sessions', icon: Store },
+    { name: 'Riwayat Transaksi', href: '/sales', icon: ShoppingCart },
     { name: 'Produk & Stok', href: '/products', icon: Package },
     { name: 'Pembelian', href: '/purchases', icon: Package },
     { name: 'Pengeluaran', href: '/expenses', icon: FileText },
@@ -117,6 +121,38 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
     menuItems.push({ name: 'Riwayat Aktivitas', href: '/audit-logs', icon: ShieldAlert as any });
   }
 
+  const isCashier = user?.role === 'CASHIER';
+
+  // ─── CASHIER LAYOUT (Touch-first, no sidebar, Bottom Nav) ─────────────
+  if (isCashier) {
+    return (
+      <div className="h-screen bg-zinc-50 flex flex-col overflow-hidden">
+        {/* Simple Top Header for Cashier */}
+        <header className="h-14 flex-shrink-0 bg-white border-b border-border flex items-center justify-between px-4 z-30">
+          <div className="font-bold text-lg text-zinc-900 flex items-center gap-2">
+            <Store size={20} className="text-primary" />
+            <span className="hidden sm:inline">POS Ennou</span>
+            <SyncIndicator />
+          </div>
+          <div className="flex items-center gap-3">
+             <span className="text-xs font-medium text-muted-foreground truncate max-w-[120px]">{user.fullName}</span>
+             <Button variant="ghost" size="sm" className="text-destructive h-8 px-2" onClick={handleLogout}>
+               <LogOut size={16} />
+             </Button>
+          </div>
+        </header>
+        
+        <main className="flex-1 min-w-0 overflow-y-auto p-2 sm:p-4">
+          {children}
+        </main>
+        
+        <OfflineIndicator />
+        <BottomNav />
+      </div>
+    );
+  }
+
+  // ─── OWNER / ADMIN LAYOUT (Desktop-first with Sidebar) ────────────────
   return (
     <div className="h-screen bg-zinc-50 flex overflow-hidden">
       {/* Mobile Sidebar Overlay */}
@@ -200,6 +236,9 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
+
+      {/* Offline status indicator */}
+      <OfflineIndicator />
     </div>
   );
 }

@@ -20,8 +20,8 @@ export function ProductFormDialog({
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     name: productToEdit?.name || '',
-    sku: productToEdit?.sku || '',
     barcode: productToEdit?.barcode || '',
+    image: productToEdit?.image || '',
     categoryId: productToEdit?.categoryId || '',
     unitId: productToEdit?.unitId || '',
     purchasePrice: productToEdit?.purchasePrice || '',
@@ -30,6 +30,33 @@ export function ProductFormDialog({
     currentStock: productToEdit ? '' : '',
     productType: productToEdit?.productType || 'RETAIL',
   });
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Ukuran gambar maksimal 5MB');
+      return;
+    }
+
+    const uploadData = new FormData();
+    uploadData.append('image', file);
+
+    try {
+      setIsUploadingImage(true);
+      const res = await api.post('/upload/image', uploadData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setFormData({ ...formData, image: res.data.url });
+      toast.success('Gambar berhasil diunggah');
+    } catch (err: any) {
+      toast.error(err?.message || 'Gagal mengunggah gambar');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
@@ -82,14 +109,42 @@ export function ProductFormDialog({
             <Label>Nama Produk</Label>
             <Input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>SKU</Label>
-              <Input required value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value})} />
-            </div>
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label>Barcode (Opsional)</Label>
-              <Input value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} />
+              <Input value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} placeholder="Scan atau ketik barcode..." />
+            </div>
+            <div className="space-y-2">
+              <Label>Gambar Produk (Opsional)</Label>
+              <div className="flex gap-4 items-center">
+                {formData.image && (
+                  <div className="w-16 h-16 rounded-md overflow-hidden border border-border bg-zinc-50 flex items-center justify-center shrink-0 shadow-sm">
+                    <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div className="flex gap-2 items-center flex-1">
+                  <Input 
+                    type="url" 
+                    value={formData.image} 
+                    onChange={e => setFormData({...formData, image: e.target.value})} 
+                    placeholder="URL Gambar..." 
+                    className="flex-1"
+                  />
+                  <span className="text-xs font-medium text-muted-foreground shrink-0">atau</span>
+                  <div className="relative overflow-hidden inline-block shrink-0">
+                    <Button type="button" variant="outline" disabled={isUploadingImage}>
+                      {isUploadingImage ? 'Mengunggah...' : 'Upload File'}
+                    </Button>
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={isUploadingImage}
+                      className="absolute inset-0 opacity-0 cursor-pointer text-[0px]"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

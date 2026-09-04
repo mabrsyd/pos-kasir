@@ -178,10 +178,21 @@ export default function ProductsPage() {
                     filteredProducts.map((product: any) => (
                       <TableRow key={product.id}>
                         <TableCell>
-                          <div className="font-medium text-foreground">{product.name}</div>
-                          <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
-                            <span>{product.sku}</span>
-                            {product.barcode && <span className="text-[10px] bg-zinc-100 px-1.5 py-0.5 rounded border">{product.barcode}</span>}
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-md bg-zinc-100 flex-shrink-0 overflow-hidden border border-border flex items-center justify-center">
+                              {product.image ? (
+                                <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <Archive size={16} className="text-zinc-400" />
+                              )}
+                            </div>
+                            <div>
+                              <div className="font-medium text-foreground">{product.name}</div>
+                              <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                                <span>{product.sku}</span>
+                                {product.barcode && <span className="text-[10px] bg-zinc-100 px-1.5 py-0.5 rounded border">{product.barcode}</span>}
+                              </div>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
