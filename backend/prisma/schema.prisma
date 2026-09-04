@@ -116,6 +116,7 @@ model Product {
   barcode       String?     @unique
   categoryId    String      @map("category_id")
   unitId        String      @map("unit_id")
+  image         String?     @db.Text
   productType   ProductType @default(RETAIL) @map("product_type")
   purchasePrice Decimal     @default(0) @map("purchase_price") @db.Decimal(15, 2)
   sellingPrice  Decimal     @default(0) @map("selling_price") @db.Decimal(15, 2)

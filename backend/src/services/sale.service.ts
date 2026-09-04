@@ -247,6 +247,7 @@ export async function listSales(params: {
     prisma.sale.findMany({
       where,
       include: {
+        items: true,
         payments: true,
         cashier: { select: { id: true, fullName: true } },
         customer: { select: { id: true, name: true } },

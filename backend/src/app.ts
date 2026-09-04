@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -26,11 +27,12 @@ import userRoutes from './routes/user.routes';
 import auditLogRoutes from './routes/auditLog.routes';
 import settingsRoutes from './routes/settings.routes';
 import syncRoutes from './routes/sync.routes';
+import uploadRoutes from './routes/upload.routes';
 
 const app = express();
 
 // Security
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors({
   origin: config.cors.origin,
   credentials: true,
@@ -59,6 +61,9 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Static files
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
+
 // API Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/categories', categoryRoutes);
@@ -78,6 +83,7 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/audit-logs', auditLogRoutes);
 app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/sync', syncRoutes);
+app.use('/api/v1/upload', uploadRoutes);
 
 // 404
 app.use((_req, res) => {

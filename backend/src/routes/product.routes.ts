@@ -10,8 +10,9 @@ router.use(authenticate);
 
 const productCreateSchema = z.object({
   name: z.string().min(1, 'Nama produk wajib diisi'),
-  sku: z.string().min(1, 'SKU wajib diisi'),
+  sku: z.string().optional(),
   barcode: z.string().optional().nullable(),
+  image: z.string().url('URL gambar tidak valid').optional().or(z.literal('')),
   categoryId: z.string().uuid('Category ID tidak valid'),
   unitId: z.string().uuid('Unit ID tidak valid'),
   productType: z.enum(['RETAIL', 'FUEL', 'OTHER']).optional(),
@@ -25,6 +26,7 @@ const productUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   sku: z.string().min(1).optional(),
   barcode: z.string().optional().nullable(),
+  image: z.string().url('URL gambar tidak valid').optional().or(z.literal('')),
   categoryId: z.string().uuid().optional(),
   unitId: z.string().uuid().optional(),
   productType: z.enum(['RETAIL', 'FUEL', 'OTHER']).optional(),

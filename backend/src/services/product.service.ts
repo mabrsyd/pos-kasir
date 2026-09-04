@@ -6,8 +6,9 @@ import { paginationMeta, PaginationMeta } from '../utils/response';
 
 interface ProductCreateInput {
   name: string;
-  sku: string;
+  sku?: string;
   barcode?: string | null;
+  image?: string | null;
   categoryId: string;
   unitId: string;
   productType?: 'RETAIL' | 'FUEL' | 'OTHER';
@@ -21,6 +22,7 @@ interface ProductUpdateInput {
   name?: string;
   sku?: string;
   barcode?: string | null;
+  image?: string | null;
   categoryId?: string;
   unitId?: string;
   productType?: 'RETAIL' | 'FUEL' | 'OTHER';
@@ -91,8 +93,14 @@ export async function getProductByBarcode(barcode: string) {
 }
 
 export async function createProduct(data: ProductCreateInput, userId: string) {
+  let sku = data.sku;
+  if (!sku) {
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+    sku = `SKU-${Date.now().toString().slice(-4)}-${randomStr}`;
+  }
+
   // Validate unique constraints
-  const existingSku = await prisma.product.findUnique({ where: { sku: data.sku } });
+  const existingSku = await prisma.product.findUnique({ where: { sku } });
   if (existingSku) throw new ConflictError('SKU sudah digunakan oleh produk lain');
 
   if (data.barcode) {
@@ -103,8 +111,9 @@ export async function createProduct(data: ProductCreateInput, userId: string) {
   const product = await prisma.product.create({
     data: {
       name: data.name,
-      sku: data.sku,
+      sku,
       barcode: data.barcode || null,
+      image: data.image || null,
       categoryId: data.categoryId,
       unitId: data.unitId,
       productType: data.productType || 'RETAIL',
@@ -172,6 +181,7 @@ export async function updateProduct(id: string, data: ProductUpdateInput, userId
       ...(data.name !== undefined && { name: data.name }),
       ...(data.sku !== undefined && { sku: data.sku }),
       ...(data.barcode !== undefined && { barcode: data.barcode }),
+      ...(data.image !== undefined && { image: data.image === '' ? null : data.image }),
       ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
       ...(data.unitId !== undefined && { unitId: data.unitId }),
       ...(data.productType !== undefined && { productType: data.productType }),
